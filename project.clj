@@ -5,7 +5,8 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [compojure "1.5.1"]
                  [ring/ring-defaults "0.2.1"]
-                 [org.clojure/data.json "0.2.6"]]
+                 [org.clojure/data.json "0.2.6"]
+                 [com.novemberain/monger "3.1.0"]]
   :plugins [[lein-ring "0.9.7"]]
   :ring {:handler project2-server.handler/app}
   :profiles
