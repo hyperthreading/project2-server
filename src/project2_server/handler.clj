@@ -40,8 +40,10 @@
 (def server-location "http://143.248.36.226:3000")
 
 "For the record, due to multipart middleware, Attached files of a form data are saved as temp file"
-(defn save-image
-  "Saves image to resources/static and returns result"
+
+"NOTE:: Two response just success every time"
+(defn image-response
+  "Saves image to resources/static and returns a result"
   [params metadata]
   (let [fileArgs (get metadata "fileName")
         uuid (java.util.UUID/randomUUID)
@@ -56,20 +58,39 @@
                                             :createdAt "2017-08-21"}
                                  :thumbnail url
                                  :url url})
-    (json/write-str {:fileName fileArgs
-                     :msg "success"
-                     :url url
-                     :uuid (str uuid)})))
+    {:fileName fileArgs
+     :msg "success"
+     :url url
+     :uuid (str uuid)}))
 
-"TODO: Add post functionality"
+(defn contact-response
+  "Saves a given contact to our atom `contacts` and returns result"
+  [{:keys [name phone email]}]
+  (let [uuid (java.util.UUID/randomUUID)
+        new-data {:uuid (str uuid)
+                  :name name
+                  :phone phone
+                  :email email}]
+    (swap! contacts
+           update :content conj new-data)
+    (assoc new-data :msg "success")))
+
+"TODO:: Add post functionality"
 (defroutes app-routes
   (GET "/" [] "Hello Clojure!!!!")
   (GET "/contacts" [] (json/write-str @contacts))
-  (POST "/contacts" [metadata :as req] (do (prn req) metadata))
+  (GET "/contacts/:uuid" [uuid] uuid)
+  (POST "/contacts" {body :body}
+        (json/write-str {:msg "success"
+                         :result (let [json-str (json/read (io/reader body)
+                                                           :key-fn keyword)]
+                                   (prn json-str)
+                                   (map contact-response
+                                        (get json-str :content)))}))
   (GET "/photos" [] (json/write-str @photos))
   (POST "/photos" [metadata :as {:keys [params] :as req}]
         (json/write-str {:msg "success"
-                         :result (map (partial save-image params)
+                         :result (map (partial image-response params)
                                       (get (json/read-str metadata) "metadata"))}))
   (route/not-found "Not Found"))
 
