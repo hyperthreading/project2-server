@@ -82,7 +82,7 @@
         uuid            (java.util.UUID/randomUUID)
         target-filename (str uuid ".jpg")
         url             (str server-location "/" target-filename)]
-    (let [data   (get-in params [(keyword fileArgs) :tempfile])
+    (let [data   (get-in params [fileArgs :tempfile])
           target (io/file (str "./resources/static/" target-filename))]
       (io/copy data target))
     (image-add-to-database {:uuid      (str uuid)
@@ -161,10 +161,11 @@
                                         (get json-str :content)))}))
   (GET "/photos" [] (json/write-str (image-get-response "")))
   (GET "/photos" [q] (json/write-str (image-get-response q)))
-  (POST "/photos" [metadata :as {:keys [params] :as req}]
+  (POST "/photos" [metadata :as {:keys [multipart-params] :as req}]
+    (do (prn req)
         (json/write-str {:msg "success"
-                         :result (map (partial image-add-response params)
-                                      (get (json/read-str metadata) "metadata"))}))
+                         :result (map (partial image-add-response multipart-params)
+                                      (get (json/read-str metadata) "metadata"))})))
   (DELETE "/photos/:uuid" [uuid] (json/write-str (image-remove-response uuid)))
   (route/not-found "Not Found"))
 
