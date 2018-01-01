@@ -37,9 +37,7 @@
                               :url fourcat}
                              ]}))
 
-  (def server-location "http://143.248.36.226:3000")
-
-; (get (json/read-str (json/write-str contacts)) "content")
+(def server-location "http://143.248.36.226:3000")
 
 "For the record, due to multipart middleware, Attached files of a form data are saved as temp file"
 (defn save-image
@@ -47,16 +45,21 @@
   [params metadata]
   (let [fileArgs (get metadata "fileName")
         uuid (java.util.UUID/randomUUID)
-        target-filename (str uuid ".jpg")]
-    (do (prn metadata)
-        (let [data (get-in params [(keyword fileArgs) :tempfile])
-              target (io/file (str "./resources/static/" target-filename))]
-          (do (prn data)
-              (io/copy data target)))
-        (json/write-str {:fileName fileArgs
-                         :msg "success"
-                         :url (str server-location "/" target-filename)
-                         :uuid (str uuid)}))))
+        target-filename (str uuid ".jpg")
+        url (str server-location "/" target-filename)]
+    (let [data (get-in params [(keyword fileArgs) :tempfile])
+          target (io/file (str "./resources/static/" target-filename))]
+      (io/copy data target))
+    (swap! photos
+           update :content conj {:uuid (str uuid)
+                                 :metadata {:uploadedAt "2017-10-12"
+                                            :createdAt "2017-08-21"}
+                                 :thumbnail url
+                                 :url url})
+    (json/write-str {:fileName fileArgs
+                     :msg "success"
+                     :url url
+                     :uuid (str uuid)})))
 
 "TODO: Add post functionality"
 (defroutes app-routes
@@ -65,10 +68,9 @@
   (POST "/contacts" [metadata :as req] (do (prn req) metadata))
   (GET "/photos" [] (json/write-str @photos))
   (POST "/photos" [metadata :as {:keys [params] :as req}]
-        (do (prn (str "received " metadata))
-            (json/write-str {:msg "success"
-                             :result (map (partial save-image params)
-                                          (get (json/read-str metadata) "metadata"))})))
+        (json/write-str {:msg "success"
+                         :result (map (partial save-image params)
+                                      (get (json/read-str metadata) "metadata"))}))
   (route/not-found "Not Found"))
 
 (def app
