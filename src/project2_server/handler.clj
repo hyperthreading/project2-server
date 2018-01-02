@@ -50,11 +50,7 @@
 
 
 "For the record, due to multipart middleware, Attached files of a form data are saved as temp file"
-
-"NOTE:: Two response just success every time"
-
-(defn image-get-from-atom
-  [] @photos)
+"TODO:: checking failed operation"
 
 (defn image-get-from-database
   []
