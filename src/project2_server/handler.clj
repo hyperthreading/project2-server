@@ -7,38 +7,6 @@
             [monger.core :as mg]
             [monger.collection :as mc]))
 
-(def contacts (atom {:content [{:uuid  "62183b10-7b96-4929-a2ea-0536ee776b0f"
-                                :name  "류석영"
-                                :email "ryu.sukyoung@gmail.com"
-                                :phone "010-1234-5678"}
-                               {:uuid  "a457656a-9632-4a9c-b0b2-f0515c668590"
-                                :name  "장병규"
-                                :email "chitos@bluehole.com"
-                                :phone "010-1234-5678"}]}))
-
-(def onecat "https://news.nationalgeographic.com/content/dam/news/photos/000/755/75552.adapt.590.1.jpg")
-(def twocat "https://static.boredpanda.com/blog/wp-content/uploads/2016/09/cats-toothless-lookalikes-3-57ce7b4a6f3e9__700.jpg")
-(def threecat "http://i.imgur.com/O9n2213.jpg")
-(def fourcat "https://cms.hostelbookers.com/hbblog/wp-content/uploads/sites/3/2012/02/cat-happy-cat-e1329931204797.jpg")
-
-(def photos (atom {:content [{:uuid      "7ab7a3d1-e171-49cd-b014-873549e266a1"
-                              :metadata  {:createdAt "2017-08-21"}
-                              :thumbnail onecat
-                              :url       onecat}
-                             {:uuid      "df2c0eee-a3fd-4087-ba83-53cd1014e24f"
-                              :metadata  {:createdAt "2017-08-21"}
-                              :thumbnail twocat
-                              :url       twocat}
-                             {:uuid      "db25f7be-ebcf-4b17-89e4-411d15a699a9"
-                              :metadata  {:createdAt "2017-08-21"}
-                              :thumbnail threecat
-                              :url       threecat}
-                             {:uuid      "22b51240-6fa9-45c0-84da-054fd6da6293"
-                              :metadata  {:createdAt "2017-08-21"}
-                              :thumbnail fourcat
-                              :url       fourcat}
-                             ]}))
-
 (def server-location "http://143.248.36.226:3000")
 (def mongo-host "localhost")
 (def mongo-port 32769)
@@ -62,10 +30,6 @@
   [q]
   (image-get-from-database))
 
-(defn image-add-to-atom [data]
-  (swap! photos
-         update :content conj data))
-
 (defn image-add-to-database [data]
   (mc/insert mongo-db
              mongo-images
@@ -83,10 +47,11 @@
       (io/copy data target))
     (image-add-to-database {:uuid      (str uuid)
                             :metadata  {:uploadedAt "2017-10-12"
-                                        :createdAt  "2017-08-21"}
+                                        :createdAt  "2017-08-21"
+                                        :name       (get metadata "name")}
                             :thumbnail url
                             :url       url
-                            :user "hpthrd"})
+                            :user      "hpthrd"})
     {:fileName fileArgs
      :msg      "success"
      :url      url
@@ -119,7 +84,7 @@
              data))
 
 (defn contact-add-response
-  "Saves a given contact to our atom `contacts` and returns result"
+  "Saves a given contact to our collection `contacts` and returns result"
   [{:keys [name phone email]}]
   (let [uuid (java.util.UUID/randomUUID)
         new-data {:uuid (str uuid)
