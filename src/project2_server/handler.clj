@@ -249,10 +249,10 @@
 (defn wrap-logger
   [handler]
   (fn [request]
-    (do (prn (:request-method request)
+    (do (println (:request-method request)
              (:uri request))
         (let [response (handler request)]
-          (prn (:status response)
+          (println (:status response)
                (:body response))
           response))))
 
