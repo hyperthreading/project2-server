@@ -8,7 +8,8 @@
             [monger.collection :as mc]
             [project2-server.cognito-auth :refer [wrap-cognito-authorization
                                                   wrap-cognito-authentication]]
-            [project2-server.settings :refer :all]))
+            [project2-server.settings :refer :all :as settings]
+            [project2-server.util :refer :all]))
 
 (defonce mongo-conn (mg/connect {:host mongo-host :port mongo-port}))
 (defonce mongo-db (mg/get-db mongo-conn mongo-dbname))
@@ -92,6 +93,21 @@
     (contact-add-to-database new-data)
     (assoc new-data :msg "success")))
 
+(defn contact-update-database
+  [uuid doc]
+  (mc/update mongo-db
+             settings/mongo-contacts
+             {:uuid uuid}
+             doc))
+
+(def contact-update-fields [:name :phone :email])
+
+(defn contact-update-response
+  [uuid json]
+  (contact-update-database uuid
+                           (get-map-with-not-nil json
+                                                 contact-update-field)))
+
 (defn contact-remove-from-database
   [uuid]
   (mc/remove mongo-db mongo-contacts {:uuid uuid}))
@@ -102,6 +118,57 @@
   (do (contact-remove-from-database uuid)
       {:msg "success"
        :uuid uuid}))
+
+(defn music-get-from-database
+  []
+  {:content
+   (map #(dissoc % :_id)
+        (mc/find-maps mongo-db
+                      settings/mongo-music
+                      {}))})
+
+(defn music-get-response
+  [q]
+  (music-get-from-database))
+
+(defn music-add-to-database [data]
+  (mc/insert mongo-db
+             settings/mongo-music
+             data))
+
+(defn music-add-response
+  "Saves music to resources/static and returns a result"
+  [params metadata]
+  (let [fileArgs        (get metadata "fileName")
+        uuid            (java.util.UUID/randomUUID)
+        target-filename (str uuid ".jpg")
+        url             (str server-location "/" target-filename)]
+    (let [data   (get-in params [fileArgs :tempfile])
+          target (io/file (str "./resources/static/" target-filename))]
+      (io/copy data target))
+    (music-add-to-database {:uuid      (str uuid)
+                            :metadata  {:uploadedAt "2017-10-12"
+                                        :createdAt  "2017-08-21"
+                                        :name       (get metadata "name")}
+                            :thumbnail url
+                            :url       url
+                            :user      "hpthrd"})
+    {:fileName fileArgs
+     :msg      "success"
+     :url      url
+     :uuid     (str uuid)}))
+
+(defn music-remove-from-database
+  [uuid]
+  (mc/remove mongo-db
+             settings/mongo-music
+             {:uuid uuid}))
+
+(defn music-remove-response
+  [uuid]
+  (do (music-remove-from-database uuid)
+      {:uuid uuid
+       :msg "success"}))
 
 "TODO:: Add post functionality"
 (defroutes app-routes
@@ -118,13 +185,14 @@
     (json/write-str (contact-remove-response uuid)))
   (PUT "/contacts/:uuid"
       [uuid :as {body :body}]
-    (json/write-str (contact-update-response uuid body)))
+    (json/write-str (contact-update-response uuid
+                                             (read-json-from-stream body
+                                                                    :key-fn keyword))))
   (POST "/contacts"
       {body :body}
     (json/write-str {:msg    "success"
-                     :result (let [json-str (with-open [reader (io/reader body)]
-                                              (json/read reader
-                                                         :key-fn keyword))]
+                     :result (let [json-str (read-json-from-stream body
+                                                                   :key-fn keyword)]
                                (prn json-str)
                                (map contact-add-response
                                     (get json-str :content)))}))
@@ -144,11 +212,42 @@
   (DELETE "/photos/:uuid"
       [uuid]
     (json/write-str (image-remove-response uuid)))
+
+  (GET "/music"
+      []
+    (json/write-str (music-get-response "")))
+  (GET "/music"
+      [q]
+    (json/write-str (music-get-response q)))
+  (POST "/music"
+      [metadata :as {:keys [multipart-params] :as req}]
+    (do (prn req)
+        (json/write-str {:msg    "success"
+                         :result (map (partial music-add-response multipart-params)
+                                      (get (json/read-str metadata) "metadata"))})))
+  (DELETE "/music/:uuid"
+      [uuid]
+    (json/write-str (music-remove-response uuid)))
+
+
   (route/not-found "Not Found"))
 
+(defn wrap-logger
+  [handler]
+  (fn [request]
+    (do (prn (:method request)
+             (:uri request))
+        (let [response (handler request)]
+          (prn (:status response)
+               (:body response))
+          response))))
+
 (def app
-  (-> (wrap-defaults app-routes (assoc-in (assoc-in api-defaults [:params :multipart] {})
-                                          [:static :resources] "static"))
+  (-> app-routes
+      (wrap-defaults (-> api-defaults
+                         (assoc-in [:params :multipart] {})
+                         (assoc-in [:static :resources] "static")))
       (wrap-cognito-authorization)
-      (wrap-cognito-authentication)))
+      (wrap-cognito-authentication)
+      (wrap-logger)))
 

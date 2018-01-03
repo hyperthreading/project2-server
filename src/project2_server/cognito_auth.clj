@@ -58,10 +58,12 @@ verify-token
     {:status 403
      :body "Not authorized"}))
 
-(defn wrap-cognito-authentication [route]
+(defn wrap-cognito-authentication
+  [route]
   (wrap-authentication route back back-2))
 
-(defn wrap-cognito-authorization [route]
+(defn wrap-cognito-authorization
+  [route]
   (fn [request]
     (authorization-backend request route)))
 
