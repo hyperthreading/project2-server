@@ -67,6 +67,11 @@ verify-token
   [route]
   (wrap-authentication route back back-2))
 
+(defn wrap-cognito-mock-authn
+  [route]
+  (fn [request]
+    (route (assoc-in request [:identity :cognito:username] "hpthrd"))))
+
 (defn wrap-cognito-authorization
   [route]
   (fn [request]

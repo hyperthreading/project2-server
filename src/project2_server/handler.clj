@@ -7,7 +7,8 @@
             [monger.core :as mg]
             [monger.collection :as mc]
             [project2-server.cognito-auth :refer [wrap-cognito-authorization
-                                                  wrap-cognito-authentication] :as cognito]
+                                                  wrap-cognito-authentication
+                                                  wrap-cognito-mock-authn] :as cognito]
             [project2-server.settings :refer :all :as settings]
             [project2-server.util :refer :all]))
 
@@ -19,14 +20,14 @@
 "TODO:: checking failed operation"
 
 (defn image-get-from-database
-  []
+  [query]
   {:content
    (map #(dissoc % :_id)
-        (mc/find-maps mongo-db mongo-images {}))})
+        (mc/find-maps mongo-db mongo-images query))})
 
 (defn image-get-response
-  [q]
-  (image-get-from-database))
+  [user-id]
+  (image-get-from-database {:user user-id}))
 
 (defn image-add-to-database [data]
   (mc/insert mongo-db
@@ -35,7 +36,7 @@
 
 (defn image-add-response
   "Saves image to resources/static and returns a result"
-  [params metadata]
+  [user-id params metadata]
   (let [fileArgs        (get metadata "fileName")
         uuid            (java.util.UUID/randomUUID)
         target-filename (str uuid ".jpg")
@@ -49,7 +50,7 @@
                                         :name       (get metadata "name")}
                             :thumbnail url
                             :url       url
-                            :user      "hpthrd"})
+                            :user      user-id})
     {:fileName fileArgs
      :msg      "success"
      :url      url
@@ -67,14 +68,14 @@
        :msg "success"}))
 
 (defn contact-get-from-database
-  [q]
-  (mc/find-maps mongo-db mongo-contacts {}))
+  [query]
+  (mc/find-maps mongo-db mongo-contacts query))
 
 (defn contact-get-response
-  []
+  [user-id]
   {:content
    (map #(dissoc % :_id)
-        (contact-get-from-database ""))})
+        (contact-get-from-database {:user user-id}))})
 
 (defn contact-add-to-database
   [data]
@@ -83,13 +84,13 @@
 
 (defn contact-add-response
   "Saves a given contact to our collection `contacts` and returns result"
-  [{:keys [name phone email]}]
+  [user-id {:keys [name phone email]}]
   (let [uuid (java.util.UUID/randomUUID)
         new-data {:uuid (str uuid)
                   :name name
                   :phone phone
                   :email email
-                  :user "hpthrd"}]
+                  :user user-id}]
     (contact-add-to-database new-data)
     (assoc new-data :msg "success")))
 
@@ -122,16 +123,16 @@
        :uuid uuid}))
 
 (defn music-get-from-database
-  []
+  [query]
   {:content
    (map #(dissoc % :_id)
         (mc/find-maps mongo-db
                       settings/mongo-music
-                      {}))})
+                      query))})
 
 (defn music-get-response
-  [q]
-  (music-get-from-database))
+  [user-id]
+  (music-get-from-database {:user user-id}))
 
 (defn music-add-to-database [data]
   (mc/insert mongo-db
@@ -140,7 +141,7 @@
 
 (defn music-add-response
   "Saves music to resources/static and returns a result"
-  [{params :multipart-params identity :identity} metadata]
+  [user-id {params :multipart-params} metadata]
   (let [file-field      (get metadata "fileName")
         thumb-field     (get metadata "thumbnail")
         uuid            (java.util.UUID/randomUUID)
@@ -164,7 +165,7 @@
                                             :artist     (get metadata "artist")}
                             :thumbnail_url thumb-url
                             :url           url
-                            :user          "hpthrd"})
+                            :user          user-id})
     {:fileName      file-field
      :msg           "success"
      :url           url
@@ -188,8 +189,8 @@
   (GET "/" [] "Hello World")
 
   (GET "/contacts"
-      []
-    (json/write-str (contact-get-response)))
+      {identity :identity}
+    (json/write-str (contact-get-response (cognito/get-user-id identity))))
   (GET "/contacts/:uuid"
       [uuid]
     uuid)
@@ -202,42 +203,42 @@
                                              (read-json-from-stream body
                                                                     :key-fn keyword))))
   (POST "/contacts"
-      {body :body}
+      {body :body identity :identity}
     (json/write-str {:msg    "success"
                      :result (let [json-str (read-json-from-stream body
-                                                                   :key-fn keyword)]
+                                                                   :key-fn keyword)
+                                   user-id (cognito/get-user-id identity)]
                                (prn json-str)
-                               (map contact-add-response
+                               (map (partial contact-add-response user-id)
                                     (get json-str :content)))}))
 
   (GET "/photos"
-      []
-    (json/write-str (image-get-response "")))
+      {identity :identity}
+    (json/write-str (image-get-response (cognito/get-user-id identity))))
   (GET "/photos"
       [q]
     (json/write-str (image-get-response q)))
   (POST "/photos"
-      [metadata :as {:keys [multipart-params] :as req}]
-    (do (prn req)
-        (json/write-str {:msg    "success"
-                         :result (map (partial image-add-response multipart-params)
-                                      (get (json/read-str metadata) "metadata"))})))
+      [metadata :as {:keys [multipart-params identity] :as req}]
+    (json/write-str {:msg    "success"
+                     :result (map (partial image-add-response
+                                           (cognito/get-user-id identity)
+                                           multipart-params)
+                                  (get (json/read-str metadata) "metadata"))}))
   (DELETE "/photos/:uuid"
       [uuid]
     (json/write-str (image-remove-response uuid)))
 
   (GET "/music"
-      []
-    (json/write-str (music-get-response "")))
-  (GET "/music"
-      [q]
-    (json/write-str (music-get-response q)))
+      {identity :identity}
+    (json/write-str (music-get-response (cognito/get-user-id identity))))
   (POST "/music"
-      [metadata :as req]
-    (do (prn req)
-        (json/write-str {:msg    "success"
-                         :result (map (partial music-add-response req)
-                                      (get (json/read-str metadata) "metadata"))})))
+      [metadata :as {identity :identity :as req}]
+    (json/write-str {:msg    "success"
+                     :result (map (partial music-add-response
+                                           (cognito/get-user-id identity)
+                                           req)
+                                  (get (json/read-str metadata) "metadata"))}))
   (DELETE "/music/:uuid"
       [uuid]
     (json/write-str (music-remove-response uuid)))
@@ -250,7 +251,7 @@
   [handler]
   (fn [request]
     (do (println (:request-method request)
-             (:uri request))
+                 (:uri request))
         (let [response (handler request)]
           (println (:status response)
                (:body response))
@@ -266,6 +267,6 @@
            (identity %)))
       (#(if settings/require-auth
           (wrap-cognito-authentication %)
-          (identity %)))
+          (wrap-cognito-mock-authn %)))
       (wrap-logger)))
 
