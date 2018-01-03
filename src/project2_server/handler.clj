@@ -140,26 +140,36 @@
 
 (defn music-add-response
   "Saves music to resources/static and returns a result"
-  [params metadata]
-  (let [fileArgs        (get metadata "fileName")
-        name            (get metadata "name")
+  [{params :multipart-params identity :identity} metadata]
+  (let [file-field      (get metadata "fileName")
+        thumb-field     (get metadata "thumbnail")
         uuid            (java.util.UUID/randomUUID)
-        target-filename (str uuid "." (extract-file-ext name "mp3"))
-        url             (str server-location "/" target-filename)]
-    (let [data   (get-in params [fileArgs :tempfile])
-          target (io/file (str "./resources/static/" target-filename))]
-      (io/copy data target))
-    (music-add-to-database {:uuid      (str uuid)
-                            :metadata  {:uploadedAt "2017-10-12"
-                                        :createdAt  "2017-08-21"
-                                        :name       name}
-                            :thumbnail url
-                            :url       url
-                            :user      "hpthrd"})
-    {:fileName fileArgs
-     :msg      "success"
-     :url      url
-     :uuid     (str uuid)}))
+        thumb-uuid      (java.util.UUID/randomUUID)
+        target-filename (str uuid "." (extract-file-ext file-field "mp3"))
+        thumb-filename  (str thumb-uuid "." (extract-file-ext thumb-field "jpg"))
+        url             (str server-location "/" target-filename)
+        thumb-url       (str server-location "/" thumb-filename)]
+    (let [data         (get-in params [file-field
+                                       :tempfile])
+          target       (io/file (str "./resources/static/" target-filename))
+          data-thumb   (get-in params [thumb-field
+                                       :tempfile])
+          target-thumb (io/file (str "./resources/static/" thumb-filename))]
+      (io/copy data target)
+      (io/copy data-thumb target-thumb))
+    (music-add-to-database {:uuid          (str uuid)
+                            :metadata      {:uploadedAt "2017-10-12"
+                                            :createdAt  "2017-08-21"
+                                            :title      (get metadata "title")
+                                            :artist     (get metadata "artist")}
+                            :thumbnail_url thumb-url
+                            :url           url
+                            :user          "hpthrd"})
+    {:fileName      file-field
+     :msg           "success"
+     :url           url
+     :thumbnail_url thumb-url
+     :uuid          (str uuid)}))
 
 (defn music-remove-from-database
   [uuid]
@@ -223,10 +233,10 @@
       [q]
     (json/write-str (music-get-response q)))
   (POST "/music"
-      [metadata :as {:keys [multipart-params] :as req}]
+      [metadata :as req]
     (do (prn req)
         (json/write-str {:msg    "success"
-                         :result (map (partial music-add-response multipart-params)
+                         :result (map (partial music-add-response req)
                                       (get (json/read-str metadata) "metadata"))})))
   (DELETE "/music/:uuid"
       [uuid]
