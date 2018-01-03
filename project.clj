@@ -11,7 +11,8 @@
                  [org.clojure/data.codec "0.1.1"]
                  [buddy "2.0.0" :exclusions [com.fasterxml.jackson.dataformat/jackson-dataformat-cbor commons-codec]]
                  [com.nimbusds/nimbus-jose-jwt "4.13"]
-                 [org.bouncycastle/bcprov-jdk15on "1.58"]]
+                 [org.bouncycastle/bcprov-jdk15on "1.58"]
+                 [com.cemerick/url "0.1.1"]]
   :plugins [[lein-ring "0.9.7"]]
   :ring {:handler project2-server.handler/app}
   :profiles

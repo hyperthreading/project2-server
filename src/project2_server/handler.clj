@@ -10,7 +10,8 @@
                                                   wrap-cognito-authentication
                                                   wrap-cognito-mock-authn] :as cognito]
             [project2-server.settings :refer :all :as settings]
-            [project2-server.util :refer :all]))
+            [project2-server.util :refer :all]
+            [cemerick.url :as url]))
 
 (defonce mongo-conn (mg/connect {:host mongo-host :port mongo-port}))
 (defonce mongo-db (mg/get-db mongo-conn mongo-dbname))
@@ -26,8 +27,8 @@
         (mc/find-maps mongo-db mongo-images query))})
 
 (defn image-get-response
-  [user-id]
-  (image-get-from-database {:user user-id}))
+  [user-id additional-query]
+  (image-get-from-database (merge additional-query {:user user-id})))
 
 (defn image-add-to-database [data]
   (mc/insert mongo-db
@@ -45,9 +46,10 @@
           target (io/file (str "./resources/static/" target-filename))]
       (io/copy data target))
     (image-add-to-database {:uuid      (str uuid)
-                            :metadata  {:uploadedAt "2017-10-12"
-                                        :createdAt  "2017-08-21"
-                                        :name       (get metadata "name")}
+                            :metadata  {:uploadedAt  "2017-10-12"
+                                        :createdAt   "2017-08-21"
+                                        :name        (get metadata "name")
+                                        :orientation (get metadata "orientation")}
                             :thumbnail url
                             :url       url
                             :user      user-id})
@@ -131,8 +133,8 @@
                       query))})
 
 (defn music-get-response
-  [user-id]
-  (music-get-from-database {:user user-id}))
+  [user-id additional-query]
+  (music-get-from-database (merge additional-query {:user user-id})))
 
 (defn music-add-to-database [data]
   (mc/insert mongo-db
@@ -143,21 +145,21 @@
   "Saves music to resources/static and returns a result"
   [user-id {params :multipart-params} metadata]
   (let [file-field      (get metadata "fileName")
-        thumb-field     (get metadata "thumbnail")
         uuid            (java.util.UUID/randomUUID)
-        thumb-uuid      (java.util.UUID/randomUUID)
         target-filename (str uuid "." (extract-file-ext file-field "mp3"))
-        thumb-filename  (str thumb-uuid "." (extract-file-ext thumb-field "jpg"))
         url             (str server-location "/" target-filename)
-        thumb-url       (str server-location "/" thumb-filename)]
-    (let [data         (get-in params [file-field
-                                       :tempfile])
-          target       (io/file (str "./resources/static/" target-filename))
-          data-thumb   (get-in params [thumb-field
-                                       :tempfile])
-          target-thumb (io/file (str "./resources/static/" thumb-filename))]
-      (io/copy data target)
-      (io/copy data-thumb target-thumb))
+        data            (get-in params [file-field :tempfile])
+        target          (io/file (str "./resources/static/" target-filename))
+        thumb-field     (get metadata "thumbnail")
+        thumb-uuid      (and thumb-field (java.util.UUID/randomUUID))
+        thumb-filename  (and thumb-field (str thumb-uuid "." (extract-file-ext thumb-field "jpg")))
+        thumb-url       (and thumb-field (str server-location "/" thumb-filename))]
+    
+    (io/copy data target)
+    (if thumb-field
+      (let [data-thumb   (get-in params [thumb-field :tempfile])
+            target-thumb (io/file (str "./resources/static/" thumb-filename))]
+        (io/copy data-thumb target-thumb)))
     (music-add-to-database {:uuid          (str uuid)
                             :metadata      {:uploadedAt "2017-10-12"
                                             :createdAt  "2017-08-21"
@@ -213,11 +215,10 @@
                                     (get json-str :content)))}))
 
   (GET "/photos"
-      {identity :identity}
-    (json/write-str (image-get-response (cognito/get-user-id identity))))
-  (GET "/photos"
-      [q]
-    (json/write-str (image-get-response q)))
+      [q :as {identity :identity}]
+    (json/write-str (image-get-response (cognito/get-user-id identity)
+                                        (and q (not= q "")
+                                             (json/read-str (url/url-decode q))))))
   (POST "/photos"
       [metadata :as {:keys [multipart-params identity] :as req}]
     (json/write-str {:msg    "success"
@@ -230,8 +231,10 @@
     (json/write-str (image-remove-response uuid)))
 
   (GET "/music"
-      {identity :identity}
-    (json/write-str (music-get-response (cognito/get-user-id identity))))
+      [q :as {identity :identity}]
+    (json/write-str (music-get-response (cognito/get-user-id identity)
+                                        (and q (not= q "")
+                                             (json/read-str (url/url-decode q))))))
   (POST "/music"
       [metadata :as {identity :identity :as req}]
     (json/write-str {:msg    "success"
@@ -257,16 +260,18 @@
                (:body response))
           response))))
 
+(defn wrap-auth-setting
+  [ruote wrapper alter]
+  (if settings/require-auth
+    (wrapper ruote)
+    (alter ruote)))
+
 (def app
   (-> app-routes
       (wrap-defaults (-> api-defaults
                          (assoc-in [:params :multipart] {})
                          (assoc-in [:static :resources] "static")))
-      (#(if settings/require-auth
-           (wrap-cognito-authorization %)
-           (identity %)))
-      (#(if settings/require-auth
-          (wrap-cognito-authentication %)
-          (wrap-cognito-mock-authn %)))
+      (wrap-auth-setting wrap-cognito-authorization identity)
+      (wrap-auth-setting wrap-cognito-authentication wrap-cognito-mock-authn)
       (wrap-logger)))
 
