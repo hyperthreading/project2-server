@@ -106,25 +106,44 @@
 "TODO:: Add post functionality"
 (defroutes app-routes
   (GET "/" [] "Hello World")
-  (GET "/contacts" [] (json/write-str (contact-get-response)))
-  (GET "/contacts/:uuid" [uuid] uuid)
-  (DELETE "/contacts/:uuid" [uuid] (json/write-str (contact-remove-response uuid)))
-  (POST "/contacts" {body :body}
-        (json/write-str {:msg "success"
-                         :result (let [json-str (with-open [reader (io/reader body)]
-                                                  (json/read reader
-                                                   :key-fn keyword))]
-                                   (prn json-str)
-                                   (map contact-add-response
-                                        (get json-str :content)))}))
-  (GET "/photos" [] (json/write-str (image-get-response "")))
-  (GET "/photos" [q] (json/write-str (image-get-response q)))
-  (POST "/photos" [metadata :as {:keys [multipart-params] :as req}]
+
+  (GET "/contacts"
+      []
+    (json/write-str (contact-get-response)))
+  (GET "/contacts/:uuid"
+      [uuid]
+    uuid)
+  (DELETE "/contacts/:uuid"
+      [uuid]
+    (json/write-str (contact-remove-response uuid)))
+  (PUT "/contacts/:uuid"
+      [uuid :as {body :body}]
+    (json/write-str (contact-update-response uuid body)))
+  (POST "/contacts"
+      {body :body}
+    (json/write-str {:msg    "success"
+                     :result (let [json-str (with-open [reader (io/reader body)]
+                                              (json/read reader
+                                                         :key-fn keyword))]
+                               (prn json-str)
+                               (map contact-add-response
+                                    (get json-str :content)))}))
+
+  (GET "/photos"
+      []
+    (json/write-str (image-get-response "")))
+  (GET "/photos"
+      [q]
+    (json/write-str (image-get-response q)))
+  (POST "/photos"
+      [metadata :as {:keys [multipart-params] :as req}]
     (do (prn req)
-        (json/write-str {:msg "success"
+        (json/write-str {:msg    "success"
                          :result (map (partial image-add-response multipart-params)
                                       (get (json/read-str metadata) "metadata"))})))
-  (DELETE "/photos/:uuid" [uuid] (json/write-str (image-remove-response uuid)))
+  (DELETE "/photos/:uuid"
+      [uuid]
+    (json/write-str (image-remove-response uuid)))
   (route/not-found "Not Found"))
 
 (def app
