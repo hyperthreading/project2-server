@@ -220,12 +220,11 @@
     (json/write-str (image-get-response q)))
   (POST "/photos"
       [metadata :as {:keys [multipart-params identity] :as req}]
-    (do (prn req)
-        (json/write-str {:msg    "success"
-                         :result (map (partial image-add-response
-                                               (cognito/get-user-id identity)
-                                               multipart-params)
-                                      (get (json/read-str metadata) "metadata"))})))
+    (json/write-str {:msg    "success"
+                     :result (map (partial image-add-response
+                                           (cognito/get-user-id identity)
+                                           multipart-params)
+                                  (get (json/read-str metadata) "metadata"))}))
   (DELETE "/photos/:uuid"
       [uuid]
     (json/write-str (image-remove-response uuid)))
@@ -235,12 +234,11 @@
     (json/write-str (music-get-response (cognito/get-user-id identity))))
   (POST "/music"
       [metadata :as {identity :identity :as req}]
-    (do (prn req)
-        (json/write-str {:msg    "success"
-                         :result (map (partial music-add-response
-                                               (cognito/get-user-id identity)
-                                               req)
-                                      (get (json/read-str metadata) "metadata"))})))
+    (json/write-str {:msg    "success"
+                     :result (map (partial music-add-response
+                                           (cognito/get-user-id identity)
+                                           req)
+                                  (get (json/read-str metadata) "metadata"))}))
   (DELETE "/music/:uuid"
       [uuid]
     (json/write-str (music-remove-response uuid)))
