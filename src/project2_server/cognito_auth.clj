@@ -30,7 +30,7 @@ verify-token
   (let [writer (new java.io.StringWriter)
         public-key (.toRSAPublicKey (. RSAKey parse (json/write-str jwk)))
         pem-writer (new org.bouncycastle.openssl.jcajce.JcaPEMWriter writer)]
-    (.writeObject pem-writer public-key)x
+    (.writeObject pem-writer public-key)
     (.flush pem-writer)
     (.toString writer)))
 
