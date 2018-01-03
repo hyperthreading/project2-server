@@ -261,7 +261,11 @@
       (wrap-defaults (-> api-defaults
                          (assoc-in [:params :multipart] {})
                          (assoc-in [:static :resources] "static")))
-      (wrap-cognito-authorization)
-      (wrap-cognito-authentication)
+      (#(if settings/require-auth
+           (wrap-cognito-authorization %)
+           (identity %)))
+      (#(if settings/require-auth
+          (wrap-cognito-authentication %)
+          (identity %)))
       (wrap-logger)))
 
