@@ -11,7 +11,8 @@
                                                   wrap-cognito-mock-authn] :as cognito]
             [project2-server.settings :refer :all :as settings]
             [project2-server.util :refer :all]
-            [cemerick.url :as url]))
+            [cemerick.url :as url]
+            [pandect.algo.md5 :refer [md5]]))
 
 (defonce mongo-conn (mg/connect {:host mongo-host :port mongo-port}))
 (defonce mongo-db (mg/get-db mongo-conn mongo-dbname))
@@ -35,28 +36,43 @@
              mongo-images
              data))
 
+(defn image-has-dupe
+  [data hash-str]
+  (do
+    (println "finding dupe of" hash-str)
+    (< 0 (count (mc/find-maps mongo-db
+                              settings/mongo-images
+                              {"metadata.md5" hash-str})))))
+
 (defn image-add-response
   "Saves image to resources/static and returns a result"
   [user-id params metadata]
   (let [fileArgs        (get metadata "fileName")
         uuid            (java.util.UUID/randomUUID)
-        target-filename (str uuid ".jpg")
-        url             (str server-location "/" target-filename)]
-    (let [data   (get-in params [fileArgs :tempfile])
-          target (io/file (str "./resources/static/" target-filename))]
-      (io/copy data target))
-    (image-add-to-database {:uuid      (str uuid)
-                            :metadata  {:uploadedAt  "2017-10-12"
-                                        :createdAt   "2017-08-21"
-                                        :name        (get metadata "name")
-                                        :orientation (get metadata "orientation")}
-                            :thumbnail url
-                            :url       url
-                            :user      user-id})
-    {:fileName fileArgs
-     :msg      "success"
-     :url      url
-     :uuid     (str uuid)}))
+        name            (get metadata "name")
+        target-filename (str uuid "." (extract-file-ext name "jpg"))
+        url             (str server-location "/" target-filename)
+        data            (get-in params [fileArgs :tempfile])
+        hash-str        (md5 data)]
+    (if (image-has-dupe data hash-str)
+      {:fileName fileArgs
+       :msg      "fail"
+       :reason   "file already exists"}
+      (let [target (io/file (str "./resources/static/" target-filename))]
+        (io/copy data target)
+        (image-add-to-database {:uuid      (str uuid)
+                                :metadata  {:uploadedAt  "2017-10-12"
+                                            :createdAt   "2017-08-21"
+                                            :name        name
+                                            :orientation (get metadata "orientation" 0)
+                                            :md5         hash-str}
+                                :thumbnail url
+                                :url       url
+                                :user      user-id})
+        {:fileName fileArgs
+         :msg      "success"
+         :url      url
+         :uuid     (str uuid)}))))
 
 (defn image-remove-from-database
   [uuid]
