@@ -24,24 +24,24 @@ verify-token
 "
 
 
-;; https://static.javadoc.io/com.nimbusds/nimbus-jose-jwt/2.21/com/nimbusds/jose/jwk/JWKSet.html
+;; https"//static.javadoc.io/com.nimbusds/nimbus-jose-jwt/2.21/com/nimbusds/jose/jwk/JWKSet.html:
 (defn jwk->pem-str [jwk]
   ;; https://www.javadoc.io/doc/com.nimbusds/nimbus-jose-jwt/4.35
   (let [writer (new java.io.StringWriter)
         public-key (.toRSAPublicKey (. RSAKey parse (json/write-str jwk)))
         pem-writer (new org.bouncycastle.openssl.jcajce.JcaPEMWriter writer)]
-    (.writeObject pem-writer public-key)
+    (.writeObject pem-writer public-key)x
     (.flush pem-writer)
     (.toString writer)))
 
-
+;; https://cognito-idp.us-east-2.amazonaws.com/us-east-2_dh4xH7cBr/.well-known/jwks.json
 
 ;; 0 - NmQMRF5/6j2uKHhadpD1iqpQaZz/dzOWqs0MQA45MNg=
-(def token-0 (str->public-key "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2z2LugVawc4V2sZRx8SG\nutEe3X8fXAydd20ZY7DbovCZPnbamCR4mkqk1TunZp6SuAqjO+1OVdbMHamVC2aA\nQLOGUzQ+OoKZfogkmhf5oiAm0gMy6lAkqVRWyJiJ2qKL+vHdVuZgkOCo1TtfJsgO\nAu7K0RgHoFbqvLK/qKv9/38wASrz95d1NQihrogfJ3epi/Pn1lE+/Yv8hOaTezaj\nBevqIZGxvALY4s5mvYvxhGfSTeFGnE1nsIH+dE6RIsG6+bKzExNyPLBZbT9IKSMf\npf0pOQJXRJclqDdmVV9rBWSLE5nl25iJEt1V+bmYo21Ke5TA9FMH/PSNj0qRXuay\n1wIDAQAB\n-----END PUBLIC KEY-----\n"))
+(def token-0 (str->public-key "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkNA0sTsG7JyahJya7y8o\npg/l07KwILhC+D6CHZv/6BEiuoVL8soq5XRWaCuD3nKRlUlqG29Z/XTsHn/zvRu6\nel9IdAopTvIcq9YqV+G0rVWPQOESHttk3nd+HBvJIVLsPJygajB0ZcqqUZ0t2p24\nDO7FYPQtmeAWwAesBBY6J4ORnIUyEVQdmo0z1JYA+2GzFoF8TWnr/7dVTTHjkxRf\n21x5Rm+GYBxJabPBEzYvJWTQC/y+koAezVs0hC6A4y9789lPQ/8lH1lVMG2lixXB\nC19C+ysYzFImSImrzA1kUG2j0RTt1wNxqKCxFwvLup4xYw8p8+RJxg7H1wS3JriD\newIDAQAB\n-----END PUBLIC KEY-----\n"))
 
 ;; 1 - Tlrjw+dQCj1qexc8gza2MBk8K/5KdJOcUOBVkGasSXw=
 
-(def token-1 (str->public-key "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlL/Q7+8inNX3KJtc3vRV\naLEhUi/BqIx+/0T+UovdXikAy3N6KHwDvsfFUcMvNhipNAO3qX33mYo5waK7x7+8\nAtNUNtgMCyTiHEM3TuOhrq8CbAkawLdRuvpjp0Qu7/b/GyW4L2zm/AFTWr1/Xqxt\n00x8A4JIkW6M1P5IDCpuVLTCa2Konr5M35vfqu38jJhOx8laH0IYqC4AxtUblwIU\nnC/Q42jGD4PQNWdjO19ZGzEoADrNGs7IcGTi789g3AebjpujjMbblv3SZy0z2cYM\nrEnnOWyx28M1VSOBi13FcuWPnvcLFWEE9NyP4GfC10/eIN3FsZGKP1qIJjqERKin\n9wIDAQAB\n-----END PUBLIC KEY-----\n"))
+(def token-1 (str->public-key "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxOiSv1d8H3omDBsPFpp4\nQ1yPpbsS7tSa5Bpk2SSBhBGlWjr/E3aMwQRA4oBBtCInARkAZZVsWoVKGNTybqpG\nSs+qBienS5ZWAWgcPH4gEAmzquMXRZ85K0T+QBe4ouKOQgUoIyOoddeA+erzAK2v\nIZa27iFVsRrI1B76vX0NLc3b+K1V/9UY3Mitckp6z6cv5R3eBRmd4s7I0QK8EZaF\nVig/2UfDnbkqOz0pR1igEqf4WQv0lzI3eF1jknzzu1ix8/DmBoW0s4ZeJEo1gx/x\n5yExL3NzeG8HZO8CcV16yJCtyiUqt2C9CjJdSsbAumRaK6xK570lKatSBuvOXSKh\noQIDAQAB\n-----END PUBLIC KEY-----\n"))
 
 (def back (backends/jws {:secret     token-0
                          :token-name "Bearer"
