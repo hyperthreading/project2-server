@@ -7,7 +7,7 @@
             [monger.core :as mg]
             [monger.collection :as mc]
             [project2-server.cognito-auth :refer [wrap-cognito-authorization
-                                                  wrap-cognito-authentication]]
+                                                  wrap-cognito-authentication] :as cognito]
             [project2-server.settings :refer :all :as settings]
             [project2-server.util :refer :all]))
 
@@ -98,15 +98,17 @@
   (mc/update mongo-db
              settings/mongo-contacts
              {:uuid uuid}
-             doc))
+             {"$set" doc}))
 
 (def contact-update-fields [:name :phone :email])
 
 (defn contact-update-response
   [uuid json]
-  (contact-update-database uuid
-                           (get-map-with-not-nil json
-                                                 contact-update-field)))
+  (do (contact-update-database uuid
+                               (get-map-with-not-nil json
+                                                     contact-update-fields))
+      {:msg "success"
+       :uuid uuid}))
 
 (defn contact-remove-from-database
   [uuid]
@@ -140,8 +142,9 @@
   "Saves music to resources/static and returns a result"
   [params metadata]
   (let [fileArgs        (get metadata "fileName")
+        name            (get metadata "name")
         uuid            (java.util.UUID/randomUUID)
-        target-filename (str uuid ".jpg")
+        target-filename (str uuid "." (extract-file-ext name "mp3"))
         url             (str server-location "/" target-filename)]
     (let [data   (get-in params [fileArgs :tempfile])
           target (io/file (str "./resources/static/" target-filename))]
@@ -149,7 +152,7 @@
     (music-add-to-database {:uuid      (str uuid)
                             :metadata  {:uploadedAt "2017-10-12"
                                         :createdAt  "2017-08-21"
-                                        :name       (get metadata "name")}
+                                        :name       name}
                             :thumbnail url
                             :url       url
                             :user      "hpthrd"})
@@ -232,10 +235,11 @@
 
   (route/not-found "Not Found"))
 
+
 (defn wrap-logger
   [handler]
   (fn [request]
-    (do (prn (:method request)
+    (do (prn (:request-method request)
              (:uri request))
         (let [response (handler request)]
           (prn (:status response)
