@@ -49,19 +49,26 @@ verify-token
 (def back-2 (backends/jws {:secret     token-1
                            :token-name "Bearer"
                            :options    {:alg :rs256}} ))
+(defn get-user-id
+  [identity-map]
+  (get-in identity-map [:cognito:username]))
+
 
 (defn authorization-backend
   [request handler]
   (if (authenticated? request)
-    (do (prn (:identity request) " is authorized")
+    (do (println (get-user-id (:identity request)) "is authorized")
         (handler request))
     {:status 403
      :body "Not authorized"}))
 
-(defn wrap-cognito-authentication [route]
+;;(get-in {:email "no1expman@gmail.com", :aud "3r8verin5ei14aqtkkm5avsh6p", :sub "8dda1e37-8542-4edb-9ac0-6d0710796518", :iss "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_Kyv5EWOmi", :cognito:username "hpthrd", :name "Yejun Kim", :exp 1514979937, :event_id "3c031714-f073-11e7-a487-957f256c940d", :email_verified true, :token_use "id", :auth_time 1514976337, :preferred_username "Yejun Kim", :iat 1514976337} [:cognito:username])
+(defn wrap-cognito-authentication
+  [route]
   (wrap-authentication route back back-2))
 
-(defn wrap-cognito-authorization [route]
+(defn wrap-cognito-authorization
+  [route]
   (fn [request]
     (authorization-backend request route)))
 
@@ -78,12 +85,11 @@ verify-token
 
 
 
-
 ;; (def tokens (:authentication-result (sign-in "hpthrd" "Trx55555@@" "us-east-2_Kyv5EWOmi" "3r8verin5ei14aqtkkm5avsh6p")))
 ;; (def id-token (:id-token tokens))
 
 
-;; (String. (jws/unsign id-token token-1 {:alg :rs256}))
+;; (String. (jws/unsign id-token token-0 {:alg :rs256}))
 ;; (def handler (wrap-authentication identity back-2 back))
 ;; (prn (:identity (handler {:headers {"authorization" (str "Bearer " id-token)}})))
 
