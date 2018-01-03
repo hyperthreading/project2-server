@@ -5,7 +5,9 @@
             [clojure.data.json :as json]
             [clojure.java.io :as io]
             [monger.core :as mg]
-            [monger.collection :as mc]))
+            [monger.collection :as mc]
+            [project2-server.cognito-auth :refer [wrap-cognito-authorization
+                                                  wrap-cognito-authentication]]))
 
 (def server-location "http://143.248.36.226:3000")
 (def mongo-host "localhost")
@@ -131,6 +133,8 @@
   (route/not-found "Not Found"))
 
 (def app
-  (wrap-defaults app-routes (assoc-in (assoc-in api-defaults [:params :multipart] {})
-                                      [:static :resources] "static")))
+  (-> (wrap-defaults app-routes (assoc-in (assoc-in api-defaults [:params :multipart] {})
+                                          [:static :resources] "static"))
+      (wrap-cognito-authorization)
+      (wrap-cognito-authentication)))
 
