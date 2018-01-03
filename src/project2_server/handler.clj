@@ -36,13 +36,17 @@
              mongo-images
              data))
 
-(defn image-has-dupe
-  [data hash-str]
+(defn md5-dupe-exist
+  [hash-str coll]
   (do
     (println "finding dupe of" hash-str)
     (< 0 (count (mc/find-maps mongo-db
-                              settings/mongo-images
+                              coll
                               {"metadata.md5" hash-str})))))
+
+(defn image-has-dupe
+  [hash-str]
+  (md5-dupe-exist hash-str settings/mongo-images))
 
 (defn image-add-response
   "Saves image to resources/static and returns a result"
@@ -54,7 +58,7 @@
         url             (str server-location "/" target-filename)
         data            (get-in params [fileArgs :tempfile])
         hash-str        (md5 data)]
-    (if (image-has-dupe data hash-str)
+    (if (image-has-dupe hash-str)
       {:fileName fileArgs
        :msg      "fail"
        :reason   "file already exists"}
@@ -152,6 +156,10 @@
   [user-id additional-query]
   (music-get-from-database (merge additional-query {:user user-id})))
 
+(defn music-has-dupe
+  [hash-str]
+  (md5-dupe-exist hash-str settings/mongo-music))
+
 (defn music-add-to-database [data]
   (mc/insert mongo-db
              settings/mongo-music
@@ -165,30 +173,36 @@
         target-filename (str uuid "." (extract-file-ext file-field "mp3"))
         url             (str server-location "/" target-filename)
         data            (get-in params [file-field :tempfile])
+        md5-str         (md5 data)
         target          (io/file (str "./resources/static/" target-filename))
         thumb-field     (get metadata "thumbnail")
         thumb-uuid      (and thumb-field (java.util.UUID/randomUUID))
         thumb-filename  (and thumb-field (str thumb-uuid "." (extract-file-ext thumb-field "jpg")))
         thumb-url       (and thumb-field (str server-location "/" thumb-filename))]
-    
-    (io/copy data target)
-    (if thumb-field
-      (let [data-thumb   (get-in params [thumb-field :tempfile])
-            target-thumb (io/file (str "./resources/static/" thumb-filename))]
-        (io/copy data-thumb target-thumb)))
-    (music-add-to-database {:uuid          (str uuid)
-                            :metadata      {:uploadedAt "2017-10-12"
-                                            :createdAt  "2017-08-21"
-                                            :title      (get metadata "title")
-                                            :artist     (get metadata "artist")}
-                            :thumbnail_url thumb-url
-                            :url           url
-                            :user          user-id})
-    {:fileName      file-field
-     :msg           "success"
-     :url           url
-     :thumbnail_url thumb-url
-     :uuid          (str uuid)}))
+    (if (music-has-dupe md5-str)
+      {:fileName file-field
+       :msg      "fail"
+       :reason   "file already exists"}
+      (do
+        (io/copy data target)
+        (if thumb-field
+          (let [data-thumb   (get-in params [thumb-field :tempfile])
+                target-thumb (io/file (str "./resources/static/" thumb-filename))]
+            (io/copy data-thumb target-thumb)))
+        (music-add-to-database {:uuid          (str uuid)
+                                :metadata      {:uploadedAt "2017-10-12"
+                                                :createdAt  "2017-08-21"
+                                                :title      (get metadata "title")
+                                                :artist     (get metadata "artist")
+                                                :md5        md5-str}
+                                :thumbnail_url thumb-url
+                                :url           url
+                                :user          user-id})
+        {:fileName      file-field
+         :msg           "success"
+         :url           url
+         :thumbnail_url thumb-url
+         :uuid          (str uuid)}))))
 
 (defn music-remove-from-database
   [uuid]
